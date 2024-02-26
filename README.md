@@ -4,6 +4,6 @@ Final Project Repository of C147/C247 for Winter Quarter 2024. Task: Classificat
 Authors: Timothy Do
 
 ## Setup
-1. Run <code>pip install -r requirements</code> to check and install all Python dependencies.
+1. Run <code>pip install -r requirements.txt</code> to check and install all Python dependencies.
 2. Run <code>jupyter notebook</code> and open the <code>Project.ipynb</code> to perform the task progressively!
 
