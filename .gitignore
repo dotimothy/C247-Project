@@ -1,2 +1,6 @@
+# Project Data
 project_data.zip
 project_data/
+
+# Jupyter Notebook Checkpoints
+.ipynb_checkpoints/
