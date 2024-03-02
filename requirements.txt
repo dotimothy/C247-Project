@@ -1,4 +1,6 @@
 torch
+keras
+tensorflow
 numpy
 matplotlib
 jupyter
