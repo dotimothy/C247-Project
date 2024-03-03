@@ -7,3 +7,4 @@ project_data/
 # Jupyter Notebook Checkpoints
 .ipynb_checkpoints/
 *.pyc
+*.pyc
