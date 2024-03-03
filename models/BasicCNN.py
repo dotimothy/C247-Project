@@ -50,6 +50,8 @@ class BasicCNN(nn.Module):
             nn.Softmax(dim=1)
         )
 
+        self.model_name = "BasicCNN"
+
     def forward(self, x):
         x = self.ConvBlock1(x)
         x = self.ConvBlock2(x)
@@ -113,7 +115,7 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256):
     train_data = torch.utils.data.TensorDataset(x_train_tensor,y_train_tensor)
     valid_data = torch.utils.data.TensorDataset(x_valid_tensor,y_valid_tensor)
     test_data = torch.utils.data.TensorDataset(x_test_tensor,y_test_tensor)
-    train_loader = torch.utils.data.DataLoader(train_data,shuffle=False,batch_size=batch_size)
+    train_loader = torch.utils.data.DataLoader(train_data,shuffle=True,batch_size=batch_size)
     val_loader = torch.utils.data.DataLoader(valid_data,shuffle=False,batch_size=batch_size)
     test_loader = torch.utils.data.DataLoader(test_data,shuffle=False,batch_size=batch_size)
 
