@@ -1,7 +1,7 @@
 # C247-Project
 Final Project Repository of C147/C247 for Winter Quarter 2024. Task: Classification of BCI EEG Actions on Different Subjects.
 
-Authors: Timothy Do
+Authors: [Timothy Do](https://timothydo.me), Brandon Kam, Josh McDermott, Steve Zang
 
 ## Setup
 1. Run <code>pip install -r requirements.txt</code> to check and install all Python dependencies.
