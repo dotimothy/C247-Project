@@ -61,7 +61,7 @@ class BasicCNN(nn.Module):
         x = self.Output(x)
         return x
 
-def DatasetLoaders(data_dir='./project_data/project',batch_size=256):
+def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=False):
     """ Function to Load in the Datasets for Preprocessing """
     ## Loading the dataset
     X_test = np.load(f"{data_dir}/X_test.npy")
@@ -93,8 +93,17 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256):
     # Creating the training and validation sets using the generated indices
     (x_train, x_valid) = X_train_valid_prep[ind_train], X_train_valid_prep[ind_valid] 
     (y_train, y_valid) = y_train_valid[ind_train], y_train_valid[ind_valid]
-    
-    
+
+    if(augment): # Apply Augmentation to Training Set Only
+      y_train_og = y_train
+      slide = 10
+      stride = 5
+      for s in range(slide):
+        X_train_aug = X_train_valid[ind_train,:,s*stride:(s*stride)+500] # Adjsut window of samples
+        y_train_aug = y_train_og # Same class label regardless of window
+        x_train = np.vstack((x_train,X_train_aug))
+        y_train = np.hstack((y_train,y_train_aug))
+  
     # Converting the labels to categorical variables for multiclass classification
     y_train = to_categorical(y_train, 4)
     y_valid = to_categorical(y_valid, 4)
