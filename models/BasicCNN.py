@@ -7,6 +7,8 @@ class BasicCNN(nn.Module):
     """ Basic CNN Architecture that was presented in Discussion #6"""
     def __init__(self):
         super(BasicCNN, self).__init__()
+        # Metadata
+        self.name = "BasicCNN"
         
         # Conv. Block 1
         self.ConvBlock1 = nn.Sequential(
@@ -49,8 +51,6 @@ class BasicCNN(nn.Module):
             nn.Linear(200*7*1, 4),
             nn.Softmax(dim=1)
         )
-
-        self.model_name = "BasicCNN"
 
     def forward(self, x):
         x = self.ConvBlock1(x)
@@ -96,8 +96,8 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=Fals
 
     if(augment): # Apply Augmentation to Training Set Only
       y_train_og = y_train
-      slide = 10
-      stride = 5
+      slide = 5
+      stride = 10
       for s in range(slide):
         X_train_aug = X_train_valid[ind_train,:,s*stride:(s*stride)+500] # Adjsut window of samples
         y_train_aug = y_train_og # Same class label regardless of window

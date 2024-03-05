@@ -6,6 +6,8 @@ from keras.utils import to_categorical
 class HybridCNNLSTM(nn.Module):
     def __init__(self):
         super(HybridCNNLSTM, self).__init__()
+        # Metadata
+        self.name = "HybridCNNLSTM"
         
         # Conv. block 1
         self.conv_block1 = nn.Sequential(
@@ -58,8 +60,6 @@ class HybridCNNLSTM(nn.Module):
             nn.Linear(10, 4),
             nn.Softmax(dim=1)
         )
-
-        self.model_name = "HybridCNNLSTM"
     
     def forward(self, x):
         x = self.conv_block1(x)
