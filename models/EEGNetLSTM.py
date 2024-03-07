@@ -16,9 +16,9 @@ class Conv2dWithConstraint(nn.Conv2d):
     return super(Conv2dWithConstraint, self).forward(x)
     
 
-class EEGNet(nn.Module):
+class EEGNetLSTM(nn.Module):
   """
-  A compact convolutional neural network (EEGNet). For more details, please refer to the following information.
+  A compact convolutional neural network (EEGNet) with an LSTM. For more details, please refer to the following information.
 
   - Paper: Lawhern V J, Solon A J, Waytowich N R, et al. EEGNet: a compact convolutional neural network for EEG-based brain-computer interfaces[J]. Journal of neural engineering, 2018, 15(5): 056013.
   - URL: https://arxiv.org/abs/1611.08024
@@ -69,8 +69,8 @@ class EEGNet(nn.Module):
          kernel_1: int = 64,
          kernel_2: int = 16,
          dropout: float = 0.25):
-    super(EEGNet, self).__init__()
-    self.name = "EEGNet"
+    super(EEGNetLSTM, self).__init__()
+    self.name = "EEGNetLSTM"
     self.F1 = F1
     self.F2 = F2
     self.D = D
@@ -104,7 +104,15 @@ class EEGNet(nn.Module):
       nn.BatchNorm2d(self.F2, momentum=0.01, affine=True, eps=1e-3), nn.ELU(), nn.AvgPool2d((1, 8), stride=8),
       nn.Dropout(p=dropout))
 
-    self.lin = nn.Linear(self.feature_dim(), num_classes, bias=False),
+    self.lin = nn.Sequential(
+      nn.Linear(self.feature_dim(), 10*num_classes,bias=False),
+      nn.ReLU())
+    self.lstm = nn.LSTM(input_size=1, hidden_size=10, num_layers=1, dropout=0.4, batch_first=True)
+    # Output layer with Softmax activation
+    self.output_layer = nn.Sequential(
+        nn.Linear(10, num_classes),
+        nn.Softmax(dim=1)
+    )
 
   def feature_dim(self):
     with torch.no_grad():
@@ -127,10 +135,62 @@ class EEGNet(nn.Module):
     x = self.block2(x)
     x = x.flatten(start_dim=1)
     x = self.lin(x)
+    x = x.view(-1, 40, 1)
+    x,_ = self.lstm(x)
+    x = self.output_layer(x[:, -1, :])
     return x
 
+def train_data_prep(X,y,sub_sample,average,noise):
+    
+    total_X = None
+    total_y = None
+    
+    # Trimming the data (sample,22,1000) -> (sample,22,800)
+    X = X[:,:,0:800]
+    
+    # Maxpooling the data (sample,22,800) -> (sample,22,800/sub_sample)
+    X_max = np.max(X.reshape(X.shape[0], X.shape[1], -1, sub_sample), axis=3)
+    
+    
+    total_X = X_max
+    total_y = y
+    
+    # Averaging + noise 
+    X_average = np.mean(X.reshape(X.shape[0], X.shape[1], -1, average),axis=3)
+    X_average = X_average + np.random.normal(0.0, 0.5, X_average.shape)
+    
+    total_X = np.vstack((total_X, X_average))
+    total_y = np.hstack((total_y, y))
+  
+    # Subsampling
+    
+    for i in range(sub_sample):
+        
+        X_subsample = X[:, :, i::sub_sample] + \
+                            (np.random.normal(0.0, 0.5, X[:, :,i::sub_sample].shape) if noise else 0.0)
+            
+        total_X = np.vstack((total_X, X_subsample))
+        total_y = np.hstack((total_y, y))
+        
+    return total_X,total_y
 
-def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=False):
+def test_valid_data_prep(X):
+    
+    total_X = None
+    
+    
+    # Trimming the data (sample,22,1000) -> (sample,22,800)
+    X = X[:,:,0:800]
+    
+    # Maxpooling the data (sample,22,800) -> (sample,22,800/sub_sample)
+    X_max = np.max(X.reshape(X.shape[0], X.shape[1], -1, 2), axis=3)
+    
+    
+    total_X = X_max
+    
+    return total_X
+
+def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=False,data_leak=False):
     """ Function to Load in the Datasets for Preprocessing """
     ## Loading the dataset
     X_test = np.load(f"{data_dir}/X_test.npy")
@@ -149,29 +209,46 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=Fals
     
     y_train_valid -= 769
     y_test -= 769
-    
-    ## Preprocessing the dataset
-    X_train_valid_prep = X_train_valid[:,:,0:500]
-    X_test_prep = X_test[:,:,0:500]
-    
-    ## Random splitting and reshaping the data
-    # First generating the training and validation indices using random splitting
-    ind_valid = np.random.choice(2115, 500, replace=False)
-    ind_train = np.array(list(set(range(2115)).difference(set(ind_valid))))
-    
-    # Creating the training and validation sets using the generated indices
-    (x_train, x_valid) = X_train_valid_prep[ind_train], X_train_valid_prep[ind_valid] 
-    (y_train, y_valid) = y_train_valid[ind_train], y_train_valid[ind_valid]
 
-    if(augment): # Apply Augmentation to Training Set Only
-      y_train_og = y_train
-      slide = 5
-      stride = 10
-      for s in range(slide):
-        X_train_aug = X_train_valid[ind_train,:,s*stride:(s*stride)+500] # Adjsut window of samples
-        y_train_aug = y_train_og # Same class label regardless of window
-        x_train = np.vstack((x_train,X_train_aug))
-        y_train = np.hstack((y_train,y_train_aug))
+    if(augment): 
+      if(data_leak): # Old Way where Val and Train were augmented
+        X_train_valid_prep,y_train_valid_prep = train_data_prep(X_train_valid,y_train_valid,2,2,True)
+        
+        # First generating the training and validation indices using random splitting
+        ind_valid = np.random.choice(8460, 1000, replace=False)
+        ind_train = np.array(list(set(range(8460)).difference(set(ind_valid))))
+        
+        # Creating the training and validation sets using the generated indices
+        (x_train, x_valid) = X_train_valid_prep[ind_train], X_train_valid_prep[ind_valid] 
+        (y_train, y_valid) = y_train_valid_prep[ind_train], y_train_valid_prep[ind_valid]
+      else:
+        # First generating the training and validation indices using random splitting
+        ind_valid = np.random.choice(2115, 500, replace=False)
+        ind_train = np.array(list(set(range(2115)).difference(set(ind_valid))))
+  
+        # Splitting
+        (x_train_prep, x_valid) = X_train_valid[ind_train], X_train_valid[ind_valid]
+        (y_train_prep, y_valid) = y_train_valid[ind_train], y_train_valid[ind_valid]
+  
+        # Apply Augmentation to Training Set Only
+        x_train, y_train = train_data_prep(x_train_prep, y_train_prep,2,2,True)
+        
+        ## Preprocessing the other Subsets
+        x_valid = test_valid_data_prep(x_valid)
+      X_test_prep = test_valid_data_prep(X_test)  
+    else:
+      ## Simple Truncation of Time-Series
+      X_train_valid_prep = X_train_valid[:,:,0:500]
+      X_test_prep = X_test[:,:,0:500]
+      
+      ## Random splitting and reshaping the data
+      # First generating the training and validation indices using random splitting
+      ind_valid = np.random.choice(2115, 500, replace=False)
+      ind_train = np.array(list(set(range(2115)).difference(set(ind_valid))))
+      
+      # Creating the training and validation sets using the generated indices
+      (x_train, x_valid) = X_train_valid_prep[ind_train], X_train_valid_prep[ind_valid] 
+      (y_train, y_valid) = y_train_valid[ind_train], y_train_valid[ind_valid]
   
     # Converting the labels to categorical variables for multiclass classification
     y_train = to_categorical(y_train, 4)
@@ -190,7 +267,6 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=Fals
     x_valid = np.swapaxes(x_valid, 3,2)
     x_test = np.swapaxes(x_test, 1,3)
     x_test = np.swapaxes(x_test, 3,2)
-
     
     # Creating Data Tensors & Datasets
     x_train_tensor = torch.tensor(x_train, dtype=torch.float32)

@@ -5,7 +5,7 @@ from keras.utils import to_categorical
 
 class BasicCNN(nn.Module):
     """ Basic CNN Architecture that was presented in Discussion #6"""
-    def __init__(self):
+    def __init__(self,chunk_size=500):
         super(BasicCNN, self).__init__()
         # Metadata
         self.name = "BasicCNN"
@@ -46,9 +46,14 @@ class BasicCNN(nn.Module):
             nn.Dropout2d(p=0.5)
         )
 
+        self.o_size = chunk_size
+        for i in range(4):
+          self.o_size = self.o_size//3 + 1
+
         # Output Layer
+        self.num_fc = 200*self.o_size*1
         self.Output = nn.Sequential(
-            nn.Linear(200*7*1, 4),
+            nn.Linear(self.num_fc, 4),
             nn.Softmax(dim=1)
         )
 
@@ -60,7 +65,7 @@ class BasicCNN(nn.Module):
         x = x.flatten(start_dim=1,end_dim=3)
         x = self.Output(x)
         return x
-
+      
 def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=False):
     """ Function to Load in the Datasets for Preprocessing """
     ## Loading the dataset

@@ -4,7 +4,7 @@ import numpy as np
 from keras.utils import to_categorical
 
 class HybridCNNLSTM(nn.Module):
-    def __init__(self):
+    def __init__(self,chunk_size=400):
         super(HybridCNNLSTM, self).__init__()
         # Metadata
         self.name = "HybridCNNLSTM"
@@ -46,8 +46,12 @@ class HybridCNNLSTM(nn.Module):
         )
         
         # FC + LSTM layers
+        self.o_size = chunk_size
+        for i in range(4):
+          self.o_size = -(-self.o_size//3)
+        self.num_fc = 200*self.o_size*1
         self.fc = nn.Sequential(
-            nn.Linear(1000, 40),
+            nn.Linear(self.num_fc, 40),
             nn.ReLU(),
             # nn.Linear(40, 1),
             # nn.ReLU()
@@ -66,7 +70,7 @@ class HybridCNNLSTM(nn.Module):
         x = self.conv_block2(x)
         x = self.conv_block3(x)
         x = self.conv_block4(x)
-        
+
         # Flatten the output
         x = x.view(x.size(0), -1)
         # print("Flatten: ",x.shape)
@@ -87,6 +91,7 @@ class HybridCNNLSTM(nn.Module):
         return x
 
 def train_data_prep(X,y,sub_sample,average,noise):
+    
     total_X = None
     total_y = None
     
@@ -106,7 +111,7 @@ def train_data_prep(X,y,sub_sample,average,noise):
     
     total_X = np.vstack((total_X, X_average))
     total_y = np.hstack((total_y, y))
-    
+  
     # Subsampling
     
     for i in range(sub_sample):
@@ -117,12 +122,12 @@ def train_data_prep(X,y,sub_sample,average,noise):
         total_X = np.vstack((total_X, X_subsample))
         total_y = np.hstack((total_y, y))
         
-    
     return total_X,total_y
 
-def test_data_prep(X):
+def test_valid_data_prep(X):
     
     total_X = None
+    
     
     # Trimming the data (sample,22,1000) -> (sample,22,800)
     X = X[:,:,0:800]
@@ -134,8 +139,8 @@ def test_data_prep(X):
     total_X = X_max
     
     return total_X
-        
-def DatasetLoaders(data_dir='./project_data/project',batch_size=256):
+
+def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=False,data_leak=False):
     """ Function to Load in the Datasets for Preprocessing """
     ## Loading the dataset
     X_test = np.load(f"{data_dir}/X_test.npy")
@@ -144,7 +149,7 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256):
     X_train_valid = np.load(f"{data_dir}/X_train_valid.npy")
     y_train_valid = np.load(f"{data_dir}/y_train_valid.npy")
     person_test = np.load(f"{data_dir}/person_test.npy")
-
+    
     ## Adjusting the labels so that 
     
     # Cue onset left - 0
@@ -155,32 +160,56 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256):
     y_train_valid -= 769
     y_test -= 769
 
-    ## Preprocessing the dataset
-    X_train_valid_prep,y_train_valid_prep = train_data_prep(X_train_valid,y_train_valid,2,2,True)
-    X_test_prep = test_data_prep(X_test) 
-    
-    ## Random splitting and reshaping the data
-    
-    # First generating the training and validation indices using random splitting
-    ind_valid = np.random.choice(8460, 1000, replace=False)
-    ind_train = np.array(list(set(range(8460)).difference(set(ind_valid))))
-    
-    # Creating the training and validation sets using the generated indices
-    (x_train, x_valid) = X_train_valid_prep[ind_train], X_train_valid_prep[ind_valid] 
-    (y_train, y_valid) = y_train_valid_prep[ind_train], y_train_valid_prep[ind_valid]
-    
-    
+    if(augment): 
+      if(data_leak): # Old Way where Val and Train were augmented
+        X_train_valid_prep,y_train_valid_prep = train_data_prep(X_train_valid,y_train_valid,2,2,True)
+        
+        # First generating the training and validation indices using random splitting
+        ind_valid = np.random.choice(8460, 1000, replace=False)
+        ind_train = np.array(list(set(range(8460)).difference(set(ind_valid))))
+        
+        # Creating the training and validation sets using the generated indices
+        (x_train, x_valid) = X_train_valid_prep[ind_train], X_train_valid_prep[ind_valid] 
+        (y_train, y_valid) = y_train_valid_prep[ind_train], y_train_valid_prep[ind_valid]
+      else:
+        # First generating the training and validation indices using random splitting
+        ind_valid = np.random.choice(2115, 500, replace=False)
+        ind_train = np.array(list(set(range(2115)).difference(set(ind_valid))))
+  
+        # Splitting
+        (x_train_prep, x_valid) = X_train_valid[ind_train], X_train_valid[ind_valid]
+        (y_train_prep, y_valid) = y_train_valid[ind_train], y_train_valid[ind_valid]
+  
+        # Apply Augmentation to Training Set Only
+        x_train, y_train = train_data_prep(x_train_prep, y_train_prep,2,2,True)
+        
+        ## Preprocessing the other Subsets
+        x_valid = test_valid_data_prep(x_valid)
+      X_test_prep = test_valid_data_prep(X_test)  
+    else:
+      ## Simple Truncation of Time-Series
+      X_train_valid_prep = X_train_valid[:,:,0:500]
+      X_test_prep = X_test[:,:,0:500]
+      
+      ## Random splitting and reshaping the data
+      # First generating the training and validation indices using random splitting
+      ind_valid = np.random.choice(2115, 500, replace=False)
+      ind_train = np.array(list(set(range(2115)).difference(set(ind_valid))))
+      
+      # Creating the training and validation sets using the generated indices
+      (x_train, x_valid) = X_train_valid_prep[ind_train], X_train_valid_prep[ind_valid] 
+      (y_train, y_valid) = y_train_valid[ind_train], y_train_valid[ind_valid]
+  
     # Converting the labels to categorical variables for multiclass classification
     y_train = to_categorical(y_train, 4)
     y_valid = to_categorical(y_valid, 4)
     y_test = to_categorical(y_test, 4)
     
-    
     # Adding width of the segment to be 1
     x_train = x_train.reshape(x_train.shape[0], x_train.shape[1], x_train.shape[2], 1)
     x_valid = x_valid.reshape(x_valid.shape[0], x_valid.shape[1], x_train.shape[2], 1)
     x_test = X_test_prep.reshape(X_test_prep.shape[0], X_test_prep.shape[1], X_test_prep.shape[2], 1)
-
+    
     # Creating Data Tensors & Datasets
     x_train_tensor = torch.tensor(x_train, dtype=torch.float32)
     x_valid_tensor = torch.tensor(x_valid, dtype=torch.float32)
