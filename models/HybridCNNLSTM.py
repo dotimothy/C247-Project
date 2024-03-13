@@ -11,7 +11,7 @@ class HybridCNNLSTM(nn.Module):
         
         # Conv. block 1
         self.conv_block1 = nn.Sequential(
-            nn.Conv2d(in_channels=22, out_channels=25, kernel_size=(5, 5), padding=2),
+            nn.Conv2d(in_channels=22, out_channels=25, kernel_size=(10, 1), padding=0),
             nn.ELU(),
             nn.MaxPool2d(kernel_size=(3, 1), padding=(1, 0)),
             nn.BatchNorm2d(25),
@@ -20,7 +20,7 @@ class HybridCNNLSTM(nn.Module):
         
         # Conv. block 2
         self.conv_block2 = nn.Sequential(
-            nn.Conv2d(in_channels=25, out_channels=50, kernel_size=(5, 5), padding=2),
+            nn.Conv2d(in_channels=25, out_channels=50, kernel_size=(10, 1), padding=0),
             nn.ELU(),
             nn.MaxPool2d(kernel_size=(3, 1), padding=(1, 0)),
             nn.BatchNorm2d(50),
@@ -29,7 +29,7 @@ class HybridCNNLSTM(nn.Module):
         
         # Conv. block 3
         self.conv_block3 = nn.Sequential(
-            nn.Conv2d(in_channels=50, out_channels=100, kernel_size=(5, 5), padding=2),
+            nn.Conv2d(in_channels=50, out_channels=100, kernel_size=(10, 1), padding=0),
             nn.ELU(),
             nn.MaxPool2d(kernel_size=(3, 1), padding=(1, 0)),
             nn.BatchNorm2d(100),
@@ -38,7 +38,7 @@ class HybridCNNLSTM(nn.Module):
         
         # Conv. block 4
         self.conv_block4 = nn.Sequential(
-            nn.Conv2d(in_channels=100, out_channels=200, kernel_size=(5, 5), padding=2),
+            nn.Conv2d(in_channels=100, out_channels=200, kernel_size=(10, 1), padding=0),
             nn.ELU(),
             nn.MaxPool2d(kernel_size=(3, 1), padding=(1, 0)),
             nn.BatchNorm2d(200),
@@ -48,7 +48,10 @@ class HybridCNNLSTM(nn.Module):
         # FC + LSTM layers
         self.o_size = chunk_size
         for i in range(4):
-          self.o_size = -(-self.o_size//3)
+          self.o_size = max(-(-(self.o_size-10-3+2)//3),0) + 1
+        # Last Pooling Layer Ommited
+        for j in range(0):
+            self.o_size = max(self.o_size-10,0) + 1
         self.num_fc = 200*self.o_size*1
         self.fc = nn.Sequential(
             nn.Linear(self.num_fc, 40),
@@ -57,7 +60,7 @@ class HybridCNNLSTM(nn.Module):
             # nn.ReLU()
         )
         
-        self.lstm = nn.LSTM(input_size=1, hidden_size=10, num_layers=1, dropout=0.4, batch_first=True)
+        self.lstm = nn.LSTM(input_size=1, hidden_size=10, num_layers=1, dropout=0.9, batch_first=True)
         
         # Output layer with Softmax activation
         self.output_layer = nn.Sequential(
