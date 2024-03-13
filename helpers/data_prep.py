@@ -2,13 +2,13 @@ import torch
 import numpy as np
 from keras.utils import to_categorical
 
-def train_data_prep(X,y,sub_sample,average,noise):
+def train_data_prep(X,y,sub_sample,average,noise,chunk_size=800):
     
     total_X = None
     total_y = None
     
     # Trimming the data (sample,22,1000) -> (sample,22,800)
-    X = X[:,:,0:800]
+    X = X[:,:,0:chunk_size]
     print('Shape of X after trimming:',X.shape)
     
     # Maxpooling the data (sample,22,800) -> (sample,22,800/sub_sample)
@@ -42,13 +42,13 @@ def train_data_prep(X,y,sub_sample,average,noise):
     print('Shape of Y:',total_y.shape)
     return total_X,total_y
 
-def test_valid_data_prep(X):
+def test_valid_data_prep(X, chunk_size=800):
     
     total_X = None
     
     
     # Trimming the data (sample,22,1000) -> (sample,22,800)
-    X = X[:,:,0:800]
+    X = X[:,:,0:chunk_size]
     print('Shape of X after trimming:',X.shape)
     
     # Maxpooling the data (sample,22,800) -> (sample,22,800/sub_sample)
@@ -60,7 +60,7 @@ def test_valid_data_prep(X):
     
     return total_X
     
-def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=False):
+def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=False,chunk_size=800,eegnet=False):
     """ Function to Load in the Datasets for Preprocessing """
     ## Loading the dataset
     X_test = np.load(f"{data_dir}/X_test.npy")
@@ -89,10 +89,10 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=Fals
     (x_train, x_valid) = X_train_valid[ind_train], X_train_valid[ind_valid] 
     (y_train, y_valid) = y_train_valid[ind_train], y_train_valid[ind_valid]
 
-    x_valid = test_valid_data_prep(x_valid)
-    X_test = test_valid_data_prep(X_test)
+    x_valid = test_valid_data_prep(x_valid, chunk_size=chunk_size)
+    X_test = test_valid_data_prep(X_test, chunk_size=chunk_size)
     if(augment): # Apply Augmentation to Training Set Only
-        x_train, y_train = train_data_prep(x_train, y_train,2,2,True)
+        x_train, y_train = train_data_prep(x_train, y_train,2,2,True, chunk_size=chunk_size)
 
   
     # Converting the labels to categorical variables for multiclass classification
@@ -104,7 +104,16 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=Fals
     x_train = x_train.reshape(x_train.shape[0], x_train.shape[1], x_train.shape[2], 1)
     x_valid = x_valid.reshape(x_valid.shape[0], x_valid.shape[1], x_train.shape[2], 1)
     x_test = X_test.reshape(X_test.shape[0], X_test.shape[1], X_test.shape[2], 1)
-    
+
+    # Swapping Axis to Conform with EEGNet
+    if(eegnet):
+      x_train = np.swapaxes(x_train, 1,3)
+      x_train = np.swapaxes(x_train, 3,2)
+      x_valid = np.swapaxes(x_valid, 1,3)
+      x_valid = np.swapaxes(x_valid, 3,2)
+      x_test = np.swapaxes(x_test, 1,3)
+      x_test = np.swapaxes(x_test, 3,2)  
+
     # Creating Data Tensors & Datasets
     x_train_tensor = torch.tensor(x_train, dtype=torch.float32)
     x_valid_tensor = torch.tensor(x_valid, dtype=torch.float32)
