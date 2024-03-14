@@ -60,7 +60,7 @@ def test_valid_data_prep(X, chunk_size=800):
     
     return total_X
     
-def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=False,chunk_size=800,eegnet=False):
+def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=False,chunk_size=800,add_width=True,eegnet=False):
     """ Function to Load in the Datasets for Preprocessing """
     ## Loading the dataset
     X_test = np.load(f"{data_dir}/X_test.npy")
@@ -102,9 +102,14 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=Fals
     y_test = to_categorical(y_test, 4)
     
     # Adding width of the segment to be 1
-    x_train = x_train.reshape(x_train.shape[0], x_train.shape[1], x_train.shape[2], 1)
-    x_valid = x_valid.reshape(x_valid.shape[0], x_valid.shape[1], x_train.shape[2], 1)
-    x_test = X_test.reshape(X_test.shape[0], X_test.shape[1], X_test.shape[2], 1)
+    if(add_width):
+      x_train = x_train.reshape(x_train.shape[0], x_train.shape[1], x_train.shape[2], 1)
+      x_valid = x_valid.reshape(x_valid.shape[0], x_valid.shape[1], x_train.shape[2], 1)
+      x_test = X_test.reshape(X_test.shape[0], X_test.shape[1], X_test.shape[2], 1)
+    else:
+      x_train = x_train.reshape(x_train.shape[0], x_train.shape[1], x_train.shape[2])
+      x_valid = x_valid.reshape(x_valid.shape[0], x_valid.shape[1], x_train.shape[2])
+      x_test = X_test.reshape(X_test.shape[0], X_test.shape[1], X_test.shape[2])
 
     # Swapping Axis to Conform with EEGNet
     if(eegnet):
