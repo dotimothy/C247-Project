@@ -56,8 +56,8 @@ class HybridCNNLSTM(nn.Module):
         # )
 
         self.lstm_input = self.determine_lstm_input(chunk_size)
-        self.lstm = nn.LSTM(input_size=self.lstm_input, hidden_size=10, num_layers=2, dropout=0.4, batch_first=True, bidirectional=True)
-        
+        self.lstm = nn.LSTM(input_size=self.lstm_input, hidden_size=10, num_layers=1, dropout=0.4, batch_first=True, bidirectional=True)
+        self.lstm_dropout = nn.Dropout(0.4)
         
         # Output layer with Softmax activation
         self.output_layer = nn.Sequential(
@@ -106,6 +106,7 @@ class HybridCNNLSTM(nn.Module):
         # LSTM layer
         #print(x.shape)
         x, _ = self.lstm(x)
+        x = self.lstm_dropout(x)
         #print(x.shape)
         
         # Output layer

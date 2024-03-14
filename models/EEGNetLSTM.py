@@ -104,15 +104,15 @@ class EEGNetLSTM(nn.Module):
       nn.BatchNorm2d(self.F2, momentum=0.01, affine=True, eps=1e-3), nn.ELU(), nn.AvgPool2d((1, 8), stride=8),
       nn.Dropout(p=dropout))
 
-    self.lin = nn.Sequential(
-      nn.Linear(self.feature_dim(), 10*num_classes,bias=False),
-      nn.ReLU())
-    self.lstm = nn.LSTM(input_size=1, hidden_size=10, num_layers=1, dropout=0.4, batch_first=True)
+    # self.lin = nn.Sequential(
+    #   nn.Linear(self.feature_dim(), 10*num_classes,bias=False),
+    #   nn.ReLU())
+    self.lstm_input = self.F2
+    self.lstm = nn.LSTM(input_size=self.lstm_input, hidden_size=10, num_layers=1, bidirectional=True, batch_first=True)
+    self.lstm_dropout = nn.Dropout(0.4)
     # Output layer with Softmax activation
-    self.output_layer = nn.Sequential(
-        nn.Linear(10, num_classes),
-        nn.Softmax(dim=1)
-    )
+    self.output_layer = nn.Linear(self.feature_dim()*10*2, num_classes)
+        
 
   def feature_dim(self):
     with torch.no_grad():
@@ -121,7 +121,9 @@ class EEGNetLSTM(nn.Module):
       mock_eeg = self.block1(mock_eeg)
       mock_eeg = self.block2(mock_eeg)
 
-    return self.F2 * mock_eeg.shape[3]
+    #return self.F2 * mock_eeg.shape[3]
+    return mock_eeg.shape[3]
+        
 
   def forward(self, x: torch.Tensor) -> torch.Tensor:
     """
@@ -133,11 +135,15 @@ class EEGNetLSTM(nn.Module):
     """
     x = self.block1(x)
     x = self.block2(x)
-    x = x.flatten(start_dim=1)
-    x = self.lin(x)
-    x = x.view(-1, 40, 1)
+    x = x.permute(0,2,3,1)
+    x = x.flatten(start_dim=1,end_dim=2)
+    # x = x.flatten(start_dim=1)
+    # x = self.lin(x)
+    # x = x.view(-1, 40, 1)
     x,_ = self.lstm(x)
-    x = self.output_layer(x[:, -1, :])
+    x = self.lstm_dropout(x)
+    x = x.flatten(start_dim=1,end_dim=2)
+    x = self.output_layer(x)
     return x
 
 def train_data_prep(X,y,sub_sample,average,noise,chunk_size=800):

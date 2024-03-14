@@ -123,6 +123,7 @@ class EEGNet(nn.Module):
     Returns:
       torch.Tensor[number of sample, number of classes]: the predicted probability that the samples belong to the classes.
     """
+    #x =  x.permute(0,3,1,2)
     x = self.block1(x)
     x = self.block2(x)
     x = x.flatten(start_dim=1)

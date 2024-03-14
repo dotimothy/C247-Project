@@ -104,7 +104,7 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=Fals
       slide = 5
       stride = 10
       for s in range(slide):
-        X_train_aug = X_train_valid[ind_train,:,s*stride:(s*stride)+500] # Adjsut window of samples
+        X_train_aug = X_train_valid[ind_train,:,s*stride:(s*stride)+chunk_size] # Adjsut window of samples
         y_train_aug = y_train_og # Same class label regardless of window
         x_train = np.vstack((x_train,X_train_aug))
         y_train = np.hstack((y_train,y_train_aug))
