@@ -140,13 +140,13 @@ class EEGNetLSTM(nn.Module):
     x = self.output_layer(x[:, -1, :])
     return x
 
-def train_data_prep(X,y,sub_sample,average,noise):
+def train_data_prep(X,y,sub_sample,average,noise,chunk_size=800):
     
     total_X = None
     total_y = None
     
     # Trimming the data (sample,22,1000) -> (sample,22,800)
-    X = X[:,:,0:800]
+    X = X[:,:,0:chunk_size]
     
     # Maxpooling the data (sample,22,800) -> (sample,22,800/sub_sample)
     X_max = np.max(X.reshape(X.shape[0], X.shape[1], -1, sub_sample), axis=3)
@@ -174,13 +174,13 @@ def train_data_prep(X,y,sub_sample,average,noise):
         
     return total_X,total_y
 
-def test_valid_data_prep(X):
+def test_valid_data_prep(X,chunk_size=800):
     
     total_X = None
     
     
     # Trimming the data (sample,22,1000) -> (sample,22,800)
-    X = X[:,:,0:800]
+    X = X[:,:,0:chunk_size]
     
     # Maxpooling the data (sample,22,800) -> (sample,22,800/sub_sample)
     X_max = np.max(X.reshape(X.shape[0], X.shape[1], -1, 2), axis=3)
@@ -190,7 +190,7 @@ def test_valid_data_prep(X):
     
     return total_X
 
-def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=False,data_leak=False):
+def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=False,data_leak=False,chunk_size=500):
     """ Function to Load in the Datasets for Preprocessing """
     ## Loading the dataset
     X_test = np.load(f"{data_dir}/X_test.npy")
@@ -212,7 +212,7 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=Fals
 
     if(augment): 
       if(data_leak): # Old Way where Val and Train were augmented
-        X_train_valid_prep,y_train_valid_prep = train_data_prep(X_train_valid,y_train_valid,2,2,True)
+        X_train_valid_prep,y_train_valid_prep = train_data_prep(X_train_valid,y_train_valid,2,2,True,chunk_size)
         
         # First generating the training and validation indices using random splitting
         ind_valid = np.random.choice(8460, 1000, replace=False)
@@ -231,15 +231,15 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=Fals
         (y_train_prep, y_valid) = y_train_valid[ind_train], y_train_valid[ind_valid]
   
         # Apply Augmentation to Training Set Only
-        x_train, y_train = train_data_prep(x_train_prep, y_train_prep,2,2,True)
+        x_train, y_train = train_data_prep(x_train_prep, y_train_prep,2,2,True,chunk_size)
         
         ## Preprocessing the other Subsets
-        x_valid = test_valid_data_prep(x_valid)
-      X_test_prep = test_valid_data_prep(X_test)  
+        x_valid = test_valid_data_prep(x_valid,chunk_size)
+      X_test_prep = test_valid_data_prep(X_test,chunk_size)  
     else:
       ## Simple Truncation of Time-Series
-      X_train_valid_prep = X_train_valid[:,:,0:500]
-      X_test_prep = X_test[:,:,0:500]
+      X_train_valid_prep = X_train_valid[:,:,0:chunk_size]
+      X_test_prep = X_test[:,:,0:chunk_size]
       
       ## Random splitting and reshaping the data
       # First generating the training and validation indices using random splitting

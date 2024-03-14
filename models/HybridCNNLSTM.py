@@ -5,13 +5,14 @@ from keras.utils import to_categorical
 
 class HybridCNNLSTM(nn.Module):
     def __init__(self,chunk_size=400):
+        """ DeepConvNet LSTM: Optimized from Discussion #7 """
         super(HybridCNNLSTM, self).__init__()
         # Metadata
         self.name = "HybridCNNLSTM"
         
         # Conv. block 1
         self.conv_block1 = nn.Sequential(
-            nn.Conv2d(in_channels=22, out_channels=25, kernel_size=(10, 1), padding=0),
+            nn.Conv2d(in_channels=22, out_channels=25, kernel_size=(10, 1), padding=(5,0)),
             nn.ELU(),
             nn.MaxPool2d(kernel_size=(3, 1), padding=(1, 0)),
             nn.BatchNorm2d(25),
@@ -20,7 +21,7 @@ class HybridCNNLSTM(nn.Module):
         
         # Conv. block 2
         self.conv_block2 = nn.Sequential(
-            nn.Conv2d(in_channels=25, out_channels=50, kernel_size=(10, 1), padding=0),
+            nn.Conv2d(in_channels=25, out_channels=50, kernel_size=(10, 1), padding=(5,0)),
             nn.ELU(),
             nn.MaxPool2d(kernel_size=(3, 1), padding=(1, 0)),
             nn.BatchNorm2d(50),
@@ -29,7 +30,7 @@ class HybridCNNLSTM(nn.Module):
         
         # Conv. block 3
         self.conv_block3 = nn.Sequential(
-            nn.Conv2d(in_channels=50, out_channels=100, kernel_size=(10, 1), padding=0),
+            nn.Conv2d(in_channels=50, out_channels=100, kernel_size=(10, 1), padding=(5,0)),
             nn.ELU(),
             nn.MaxPool2d(kernel_size=(3, 1), padding=(1, 0)),
             nn.BatchNorm2d(100),
@@ -38,7 +39,7 @@ class HybridCNNLSTM(nn.Module):
         
         # Conv. block 4
         self.conv_block4 = nn.Sequential(
-            nn.Conv2d(in_channels=100, out_channels=200, kernel_size=(10, 1), padding=0),
+            nn.Conv2d(in_channels=100, out_channels=200, kernel_size=(10, 1), padding=(5,0)),
             nn.ELU(),
             nn.MaxPool2d(kernel_size=(3, 1), padding=(1, 0)),
             nn.BatchNorm2d(200),
@@ -46,27 +47,43 @@ class HybridCNNLSTM(nn.Module):
         )
         
         # FC + LSTM layers
-        self.o_size = chunk_size
-        for i in range(4):
-          self.o_size = max(-(-(self.o_size-10-3+2)//3),0) + 1
-        # Last Pooling Layer Ommited
-        for j in range(0):
-            self.o_size = max(self.o_size-10,0) + 1
-        self.num_fc = 200*self.o_size*1
-        self.fc = nn.Sequential(
-            nn.Linear(self.num_fc, 40),
-            nn.ReLU(),
-            # nn.Linear(40, 1),
-            # nn.ReLU()
-        )
+        # self.num_fc = self.determine_fc_size(chunk_size)
+        # self.fc = nn.Sequential(
+        #     nn.Linear(self.num_fc, 40),
+        #     nn.ReLU(),
+        #     # nn.Linear(40, 1),
+        #     # nn.ReLU()
+        # )
+
+        self.lstm_input = self.determine_lstm_input(chunk_size)
+        self.lstm = nn.LSTM(input_size=self.lstm_input, hidden_size=10, num_layers=2, dropout=0.4, batch_first=True, bidirectional=True)
         
-        self.lstm = nn.LSTM(input_size=1, hidden_size=10, num_layers=1, dropout=0.9, batch_first=True)
         
         # Output layer with Softmax activation
         self.output_layer = nn.Sequential(
-            nn.Linear(10, 4),
+            #nn.Linear(20,4)
+            nn.Linear(200*20, 4),
             nn.Softmax(dim=1)
         )
+
+    # def determine_fc_size(self,chunk_size):
+    #     with torch.no_grad():
+    #         x = torch.zeros(2,22,chunk_size,1)
+    #         x = self.conv_block1(x)
+    #         x = self.conv_block2(x)
+    #         x = self.conv_block3(x)
+    #         x = self.conv_block4(x)
+    #         return 200*x.shape[2]*1
+
+    def determine_lstm_input(self,chunk_size):
+        with torch.no_grad():
+            x = torch.zeros(2,22,chunk_size,1)
+            x = self.conv_block1(x)
+            x = self.conv_block2(x)
+            x = self.conv_block3(x)
+            x = self.conv_block4(x)
+            return x.shape[2]
+        
     
     def forward(self, x):
         x = self.conv_block1(x)
@@ -75,31 +92,36 @@ class HybridCNNLSTM(nn.Module):
         x = self.conv_block4(x)
 
         # Flatten the output
-        x = x.view(x.size(0), -1)
-        # print("Flatten: ",x.shape)
+        #x = x.view(x.size(0), -1)
+        #print("Flatten: ",x.shape)
         
         # FC layer
-        x = self.fc(x)
-        # print("FC: ", x.shape )
+        #x = self.fc(x)
+        #print("FC: ", x.shape )
         
         # Reshape for LSTM
-        x = x.view(-1, 40, 1)
+        x = x.flatten(start_dim=2,end_dim=3)
+        #x = x.view(-1,200,1)
 
         # LSTM layer
+        #print(x.shape)
         x, _ = self.lstm(x)
+        #print(x.shape)
         
         # Output layer
-        x = self.output_layer(x[:, -1, :])
+        #x = x[:,-1.:] # only use last output
+        x = x.flatten(start_dim=1,end_dim=2) # use all outputs
+        x = self.output_layer(x)
         
         return x
 
-def train_data_prep(X,y,sub_sample,average,noise):
+def train_data_prep(X,y,sub_sample,average,noise,chunk_size=800):
     
     total_X = None
     total_y = None
     
     # Trimming the data (sample,22,1000) -> (sample,22,800)
-    X = X[:,:,0:800]
+    X = X[:,:,0:chunk_size]
     
     # Maxpooling the data (sample,22,800) -> (sample,22,800/sub_sample)
     X_max = np.max(X.reshape(X.shape[0], X.shape[1], -1, sub_sample), axis=3)
@@ -127,13 +149,13 @@ def train_data_prep(X,y,sub_sample,average,noise):
         
     return total_X,total_y
 
-def test_valid_data_prep(X):
+def test_valid_data_prep(X,chunk_size=800):
     
     total_X = None
     
     
     # Trimming the data (sample,22,1000) -> (sample,22,800)
-    X = X[:,:,0:800]
+    X = X[:,:,0:chunk_size]
     
     # Maxpooling the data (sample,22,800) -> (sample,22,800/sub_sample)
     X_max = np.max(X.reshape(X.shape[0], X.shape[1], -1, 2), axis=3)
@@ -143,7 +165,7 @@ def test_valid_data_prep(X):
     
     return total_X
 
-def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=False,data_leak=False):
+def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=False,data_leak=False,chunk_size=500):
     """ Function to Load in the Datasets for Preprocessing """
     ## Loading the dataset
     X_test = np.load(f"{data_dir}/X_test.npy")
@@ -165,7 +187,7 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=Fals
 
     if(augment): 
       if(data_leak): # Old Way where Val and Train were augmented
-        X_train_valid_prep,y_train_valid_prep = train_data_prep(X_train_valid,y_train_valid,2,2,True)
+        X_train_valid_prep,y_train_valid_prep = train_data_prep(X_train_valid,y_train_valid,2,2,True,chunk_size)
         
         # First generating the training and validation indices using random splitting
         ind_valid = np.random.choice(8460, 1000, replace=False)
@@ -184,15 +206,15 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=Fals
         (y_train_prep, y_valid) = y_train_valid[ind_train], y_train_valid[ind_valid]
   
         # Apply Augmentation to Training Set Only
-        x_train, y_train = train_data_prep(x_train_prep, y_train_prep,2,2,True)
+        x_train, y_train = train_data_prep(x_train_prep, y_train_prep,2,2,True,chunk_size)
         
         ## Preprocessing the other Subsets
-        x_valid = test_valid_data_prep(x_valid)
-      X_test_prep = test_valid_data_prep(X_test)  
+        x_valid = test_valid_data_prep(x_valid,chunk_size)
+      X_test_prep = test_valid_data_prep(X_test,chunk_size)  
     else:
       ## Simple Truncation of Time-Series
-      X_train_valid_prep = X_train_valid[:,:,0:500]
-      X_test_prep = X_test[:,:,0:500]
+      X_train_valid_prep = X_train_valid[:,:,0:chunk_size]
+      X_test_prep = X_test[:,:,0:chunk_size]
       
       ## Random splitting and reshaping the data
       # First generating the training and validation indices using random splitting

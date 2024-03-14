@@ -4,7 +4,7 @@ import numpy as np
 from keras.utils import to_categorical
 
 class BasicCNN(nn.Module):
-    """ Basic CNN Architecture that was presented in Discussion #6"""
+    """ DeepConvNet: Basic CNN Architecture that was presented in Discussion #6"""
     def __init__(self,chunk_size=500):
         super(BasicCNN, self).__init__()
         # Metadata
@@ -66,7 +66,7 @@ class BasicCNN(nn.Module):
         x = self.Output(x)
         return x
       
-def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=False):
+def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=False,chunk_size=500):
     """ Function to Load in the Datasets for Preprocessing """
     ## Loading the dataset
     X_test = np.load(f"{data_dir}/X_test.npy")
@@ -87,8 +87,8 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=Fals
     y_test -= 769
     
     ## Preprocessing the dataset
-    X_train_valid_prep = X_train_valid[:,:,0:500]
-    X_test_prep = X_test[:,:,0:500]
+    X_train_valid_prep = X_train_valid[:,:,0:chunk_size]
+    X_test_prep = X_test[:,:,0:chunk_size]
     
     ## Random splitting and reshaping the data
     # First generating the training and validation indices using random splitting
