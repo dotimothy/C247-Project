@@ -4,7 +4,7 @@ import copy
 
 def train_earlystop(device,model,loss_fn,optimizer,train_loader,val_loader,test_loader,num_epochs=100):
     # Training Loop
-    print('\nStarting to Train {} for {} Epochs!'.format(model.name,num_epochs))
+    # print('\nStarting to Train {} for {} Epochs!'.format(model.name,num_epochs))
     train_loss = []
     val_loss = []
     val_acc = 0

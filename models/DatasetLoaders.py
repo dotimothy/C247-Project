@@ -3,118 +3,6 @@ import torch.nn as nn
 import numpy as np 
 from keras.utils import to_categorical
 
-class HybridCNNLSTM(nn.Module):
-    def __init__(self,chunk_size=400):
-        """ DeepConvNet LSTM: Optimized from Discussion #7 """
-        super(HybridCNNLSTM, self).__init__()
-        # Metadata
-        self.name = "HybridCNNLSTM"
-        
-        # Conv. block 1
-        self.conv_block1 = nn.Sequential(
-            nn.Conv2d(in_channels=22, out_channels=25, kernel_size=(10, 1), padding=(5,0)),
-            nn.ELU(),
-            nn.MaxPool2d(kernel_size=(3, 1), padding=(1, 0)),
-            nn.BatchNorm2d(25),
-            nn.Dropout(0.6)
-        )
-        
-        # Conv. block 2
-        self.conv_block2 = nn.Sequential(
-            nn.Conv2d(in_channels=25, out_channels=50, kernel_size=(10, 1), padding=(5,0)),
-            nn.ELU(),
-            nn.MaxPool2d(kernel_size=(3, 1), padding=(1, 0)),
-            nn.BatchNorm2d(50),
-            nn.Dropout(0.6)
-        )
-        
-        # Conv. block 3
-        self.conv_block3 = nn.Sequential(
-            nn.Conv2d(in_channels=50, out_channels=100, kernel_size=(10, 1), padding=(5,0)),
-            nn.ELU(),
-            nn.MaxPool2d(kernel_size=(3, 1), padding=(1, 0)),
-            nn.BatchNorm2d(100),
-            nn.Dropout(0.6)
-        )
-        
-        # Conv. block 4
-        self.conv_block4 = nn.Sequential(
-            nn.Conv2d(in_channels=100, out_channels=200, kernel_size=(10, 1), padding=(5,0)),
-            nn.ELU(),
-            nn.MaxPool2d(kernel_size=(3, 1), padding=(1, 0)),
-            nn.BatchNorm2d(200),
-            nn.Dropout(0.6)
-        )
-        
-        # FC + LSTM layers
-        # self.num_fc = self.determine_fc_size(chunk_size)
-        # self.fc = nn.Sequential(
-        #     nn.Linear(self.num_fc, 40),
-        #     nn.ReLU(),
-        #     # nn.Linear(40, 1),
-        #     # nn.ReLU()
-        # )
-
-        self.lstm_input = self.determine_lstm_input(chunk_size)
-        self.lstm = nn.LSTM(input_size=self.lstm_input, hidden_size=10, num_layers=2, dropout=0.4, batch_first=True, bidirectional=True)
-        
-        
-        # Output layer with Softmax activation
-        self.output_layer = nn.Sequential(
-            #nn.Linear(20,4)
-            nn.Linear(200*20, 4),
-            nn.Softmax(dim=1)
-        )
-
-    # def determine_fc_size(self,chunk_size):
-    #     with torch.no_grad():
-    #         x = torch.zeros(2,22,chunk_size,1)
-    #         x = self.conv_block1(x)
-    #         x = self.conv_block2(x)
-    #         x = self.conv_block3(x)
-    #         x = self.conv_block4(x)
-    #         return 200*x.shape[2]*1
-
-    def determine_lstm_input(self,chunk_size):
-        with torch.no_grad():
-            x = torch.zeros(2,22,chunk_size,1)
-            x = self.conv_block1(x)
-            x = self.conv_block2(x)
-            x = self.conv_block3(x)
-            x = self.conv_block4(x)
-            return x.shape[2]
-        
-    
-    def forward(self, x):
-        x = self.conv_block1(x)
-        x = self.conv_block2(x)
-        x = self.conv_block3(x)
-        x = self.conv_block4(x)
-
-        # Flatten the output
-        #x = x.view(x.size(0), -1)
-        #print("Flatten: ",x.shape)
-        
-        # FC layer
-        #x = self.fc(x)
-        #print("FC: ", x.shape )
-        
-        # Reshape for LSTM
-        x = x.flatten(start_dim=2,end_dim=3)
-        #x = x.view(-1,200,1)
-
-        # LSTM layer
-        #print(x.shape)
-        x, _ = self.lstm(x)
-        #print(x.shape)
-        
-        # Output layer
-        #x = x[:,-1.:] # only use last output
-        x = x.flatten(start_dim=1,end_dim=2) # use all outputs
-        x = self.output_layer(x)
-        
-        return x
-
 def train_data_prep(X,y,sub_sample,average,noise,chunk_size=800):
     
     total_X = None
@@ -229,18 +117,24 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=Fals
     y_valid = to_categorical(y_valid, 4)
     y_test = to_categorical(y_test, 4)
     
-    # Adding width of the segment to be 1
-    x_train = x_train.reshape(x_train.shape[0], x_train.shape[1], x_train.shape[2], 1)
-    x_valid = x_valid.reshape(x_valid.shape[0], x_valid.shape[1], x_train.shape[2], 1)
-    x_test = X_test_prep.reshape(X_test_prep.shape[0], X_test_prep.shape[1], X_test_prep.shape[2], 1)
+    # reshape for the sake of EEGConformer Reuirements
+    x_train = x_train.reshape(x_train.shape[0], x_train.shape[1], x_train.shape[2])
+    x_valid = x_valid.reshape(x_valid.shape[0], x_valid.shape[1], x_train.shape[2])
+    x_test = X_test_prep.reshape(X_test_prep.shape[0], X_test_prep.shape[1], X_test_prep.shape[2])
     
     # Creating Data Tensors & Datasets
     x_train_tensor = torch.tensor(x_train, dtype=torch.float32)
+    # print("x_train_tensor shape: ", x_train_tensor.shape)
     x_valid_tensor = torch.tensor(x_valid, dtype=torch.float32)
+    # print("x_valid_tensor shape: ", x_valid_tensor.shape)
     x_test_tensor = torch.tensor(x_test, dtype=torch.float32)
+    # print("x_test_tensor shape: ", x_test_tensor.shape)
     y_train_tensor = torch.tensor(y_train, dtype=torch.float32)
+    # print("y_train_tensor shape: ", y_train_tensor.shape)
     y_valid_tensor = torch.tensor(y_valid, dtype=torch.float32)
+    # print("y_valid_tensor shape: ", y_valid_tensor.shape)
     y_test_tensor = torch.tensor(y_test, dtype=torch.float32)
+    # print("y_test_tensor shape: ", y_test_tensor.shape)
     train_data = torch.utils.data.TensorDataset(x_train_tensor,y_train_tensor)
     valid_data = torch.utils.data.TensorDataset(x_valid_tensor,y_valid_tensor)
     test_data = torch.utils.data.TensorDataset(x_test_tensor,y_test_tensor)
