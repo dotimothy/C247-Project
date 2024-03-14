@@ -2,14 +2,15 @@ import torch
 import numpy as np
 from keras.utils import to_categorical
 
-def train_data_prep(X,y,sub_sample,average,noise,chunk_size=800):
+def train_data_prep(X,y,sub_sample,average,noise,chunk_size=800,verbose=False):
     
     total_X = None
     total_y = None
     
     # Trimming the data (sample,22,1000) -> (sample,22,800)
     X = X[:,:,0:chunk_size]
-    print('Shape of X after trimming:',X.shape)
+    if(verbose):
+      print('Shape of X after trimming:',X.shape)
     
     # Maxpooling the data (sample,22,800) -> (sample,22,800/sub_sample)
     X_max = np.max(X.reshape(X.shape[0], X.shape[1], -1, sub_sample), axis=3)
@@ -17,7 +18,8 @@ def train_data_prep(X,y,sub_sample,average,noise,chunk_size=800):
     
     total_X = X_max
     total_y = y
-    print('Shape of X after maxpooling:',total_X.shape)
+    if(verbose):
+      print('Shape of X after maxpooling:',total_X.shape)
     
     # Averaging + noise 
     X_average = np.mean(X.reshape(X.shape[0], X.shape[1], -1, average),axis=3)
@@ -25,7 +27,8 @@ def train_data_prep(X,y,sub_sample,average,noise,chunk_size=800):
     
     total_X = np.vstack((total_X, X_average))
     total_y = np.hstack((total_y, y))
-    print('Shape of X after averaging+noise and concatenating:',total_X.shape)
+    if(verbose):
+      print('Shape of X after averaging+noise and concatenating:',total_X.shape)
     
     # Subsampling
     
@@ -37,26 +40,28 @@ def train_data_prep(X,y,sub_sample,average,noise,chunk_size=800):
         total_X = np.vstack((total_X, X_subsample))
         total_y = np.hstack((total_y, y))
         
-    
-    print('Shape of X after subsampling and concatenating:',total_X.shape)
-    print('Shape of Y:',total_y.shape)
+    if(verbose):
+      print('Shape of X after subsampling and concatenating:',total_X.shape)
+      print('Shape of Y:',total_y.shape)
     return total_X,total_y
 
-def test_valid_data_prep(X, chunk_size=800):
+def test_valid_data_prep(X, chunk_size=800,verbose=False):
     
     total_X = None
     
     
     # Trimming the data (sample,22,1000) -> (sample,22,800)
     X = X[:,:,0:chunk_size]
-    print('Shape of X after trimming:',X.shape)
+    if(verbose):
+      print('Shape of X after trimming:',X.shape)
     
     # Maxpooling the data (sample,22,800) -> (sample,22,800/sub_sample)
     X_max = np.max(X.reshape(X.shape[0], X.shape[1], -1, 2), axis=3)
     
     
     total_X = X_max
-    print('Shape of X after maxpooling:',total_X.shape)
+    if(verbose):
+      print('Shape of X after maxpooling:',total_X.shape)
     
     return total_X
     
@@ -167,8 +172,8 @@ def SubjectLoaders(data_dir='./project_data/project',batch_size=256,augment=Fals
     
     ## Random splitting and reshaping the data
     # First generating the training and validation indices using random splitting
-    ind_valid = np.random.choice(2115, 500, replace=False)
-    ind_train = np.array(list(set(range(2115)).difference(set(ind_valid))))
+    ind_valid = np.random.choice(X_train_valid.shape[0], int(0.1*X_train_valid.shape[0]), replace=False)
+    ind_train = np.array(list(set(range(X_train_valid.shape[0])).difference(set(ind_valid))))
     
     # Creating the training and validation sets using the generated indices
     (x_train, x_valid) = X_train_valid[ind_train], X_train_valid[ind_valid] 
