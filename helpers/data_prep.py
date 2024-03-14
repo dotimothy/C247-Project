@@ -93,7 +93,8 @@ def DatasetLoaders(data_dir='./project_data/project',batch_size=256,augment=Fals
     X_test = test_valid_data_prep(X_test, chunk_size=chunk_size)
     if(augment): # Apply Augmentation to Training Set Only
         x_train, y_train = train_data_prep(x_train, y_train,2,2,True, chunk_size=chunk_size)
-
+    else:
+        x_train = test_valid_data_prep(x_train, chunk_size=chunk_size)
   
     # Converting the labels to categorical variables for multiclass classification
     y_train = to_categorical(y_train, 4)
