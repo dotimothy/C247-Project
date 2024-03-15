@@ -128,3 +128,24 @@ def eval(device,model,test_loader):
             test_count += test_x.size(0)
         test_acc = test_correct_count / test_count
         return test_acc  
+
+def eval_ensemble_majority(device, models, test_loader):
+    for model in models:
+        model.eval()
+    with torch.no_grad():
+        test_count = 0
+        test_correct_count = 0
+        for idx, (test_x, test_y) in enumerate(test_loader):
+            test_x = test_x.float().to(device)
+            test_y = test_y.float().to(device)
+            votes = torch.zeros(test_x.size(0),len(models),device=device)
+            for model_idx, model in enumerate(models):
+                logits = model(test_x).detach()
+                y_hat = torch.argmax(logits, dim=-1)
+                votes[:, model_idx] = y_hat            
+            y_hat_majority, _ = torch.mode(votes, dim=-1)
+            y = torch.argmax(test_y, dim=-1)
+            test_correct_count += torch.sum(y_hat_majority == y, axis=-1)
+            test_count += test_x.size(0)
+        test_acc = test_correct_count / test_count
+        return test_acc
