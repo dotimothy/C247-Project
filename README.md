@@ -5,5 +5,5 @@ Authors: [Timothy Do](https://timothydo.me), Brandon Kam, Josh McDermott, Steve 
 
 ## Setup
 1. Run <code>pip install -r requirements.txt</code> to check and install all Python dependencies.
-2. Run <code>jupyter notebook</code> and open the <code>Project.ipynb</code> to perform the task progressively!
+2. Run <code>jupyter notebook</code> and open the <code>Project.ipynb</code> to perform the task progressively! This main notebook covers data exploration, 
 
