@@ -1,3 +1,4 @@
+# Project Dependencies
 torch
 keras
 tensorflow
@@ -6,3 +7,5 @@ matplotlib
 jupyter
 gdown
 braindecode
+tqdm
+torch-summary 
